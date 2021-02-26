@@ -1,0 +1,16 @@
+# CEDI_BBLAYERS_CONF_VERSION is increased each time build/conf/bblayers.conf
+# changes incompatibly, also REQUIRED_CEDI_BBLAYERS_CONF_VERSION in all other
+# layer.conf should be increased at be the same value.
+CEDI_BBLAYERS_CONF_VERSION = "1"
+
+BBPATH = "${TOPDIR}"
+BSPDIR := "${@os.path.abspath('##OEROOT##/../..')}"
+BBFILES ?= ""
+
+BBLAYERS = " \
+  ${BSPDIR}/sources/poky/meta \
+  ${BSPDIR}/sources/poky/meta-poky \
+  ${BSPDIR}/sources/poky/meta-yocto-bsp \
+  \
+  ${BSPDIR}/sources/central/meta-cedi \
+"

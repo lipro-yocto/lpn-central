@@ -1,0 +1,348 @@
+#!/bin/bash
+# -*- mode: shell-script; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
+#
+# Copyright (C) 2014-2021 Li-Pro.Net
+# Edited-by:  Stephan Linz <linz@li-pro.net>
+#             Volker Kempert <volker.kempert@almedso.de>
+#
+# Copyright (C) 2012, 2013 O.S. Systems Software LTDA.
+# Authored-by:  Otavio Salvador <otavio@ossystems.com.br>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Add options for the script
+# Copyright (C) 2013 Freescale Semiconductor, Inc.
+#
+
+MAGICKEY="CeDiNic"
+MAGICSRC="sources"
+
+# This script shall be sourced from a bash shell
+
+if ! ps -o command -p $$ | grep bash -q ; then
+   echo "ERROR: This script shall be sourced from bash shell."
+   echo "       Sourcing the script failed."
+   return 1
+fi
+
+# code following hereafter is BASH code
+
+[[ "x${DEBUG}" == 'xtrue' ]] && set -o xtrace   # aka set -x
+set -o errexit                                  # aka set -e
+set -o pipefail
+
+# Note: external dependency by convention:
+#       a) This script is called from the root directory where the
+#          repo tool was calling from (repo init; repo sync).
+#       b) The repo manifest states that this script is checked out to
+#          even this root directory --> CWD (current working directory).
+#       c) The repo manifest states that the (Yocto) poky repo is checked out to
+#          sources/poky --> YPR (Yocto/Poky Project Root).
+#       d) The repo manifest states that this repo is checked out to
+#          sources/central --> CDR (Central Distribution Root).
+CWD=$(pwd)
+YPR=${CWD}/${MAGICSRC}/poky
+CDR=${CWD}/${MAGICSRC}/central/meta-cedi
+PROGNAME="$(basename ${BASH_SOURCE[0]})"
+
+# other setup environment files allow the user to specify site specific environment
+# variables that override the defaults.  This site.conf will be linked to
+# ~/.yocto/site.conf or ~/.oe/site.conf
+SITECONF_DIRS="     \
+    $SITECONF       \
+    $HOME/.yocto    \
+    $HOME/.oe       \
+"
+
+# The following environment variables are saved and passed to
+# Yocto so they will affect the build:
+PASSED_VARS="                   \
+    YOCTO_DOWNLOAD_DIR          \
+    YOCTO_SSTATE_DIR            \
+    PACKAGE_FEED_URIS           \
+    PACKAGE_FEED_BASE_PATHS     \
+    INCLUDE_BUILD_HISTORY       \
+    SDKMACHINE                  \
+    DISTRO                      \
+    MACHINE                     \
+"
+
+usage()
+{
+    echo -e "\nUsage: source $PROGNAME
+
+Establish a build environment in BUILD_DIR:
+- create local.conf (if it not exists)
+- create site.conf from either ${HOME}/.oe/site.conf or ${HOME}/.yocto/site.conf
+
+Command arguments (to be given with script sourcing):
+
+Environment variables (to be evaluated when sourced):
+
+BUILD_DIR
+    Specifies the build directory location (optional).
+    Default is 'build'.
+CLEAN_BUILD
+    Flag if true it removes the builddir before building.
+    Default is false.
+INCLUDE_BUILD_HISTORY
+    Record build changes via git build history.
+    Default is false.
+
+The following environment variables are saved and passed to
+Yocto so they will affect the build:
+$(for v in ${PASSED_VARS}; do echo -e "    ${v}"; done)
+
+The above values are stored in a section at the end of local.conf
+and updated if the values change.
+"
+
+    return 0
+}
+
+clean_up()
+{
+    unset MAGICKEY MAGICSRC CWD PROGNAME TEMPLATECONF
+    unset SITECONF_DIRS PASSED_VARS
+    unset BUILD_DIR CLEAN_BUILD
+    unset SDKMACHINE INCLUDE_BUILD_HISTORY
+    unset have_bblayers generated_config have_siteconfig
+    unset write_local_conf_additions
+    unset link_site_conf
+    unset sanity_checks
+    unset init_variables
+    unset init_bitbake
+    unset main usage
+    [[ "x${DEBUG}" == 'xtrue' ]] && set +o xtrace
+    set +o pipefail
+    set +o errexit
+    unset clean_up
+
+    return 0
+}
+
+init_variables ()
+{
+    # input - possibly injected from environment
+    declare -g BUILD_DIR=${BUILD_DIR:-"build"}
+    declare -g SDKMACHINE=${SDKMACHINE:-"x86_64"}
+
+    # input flags - possibly injected
+    declare -g CLEAN_BUILD=${CLEAN_BUILD:-"false"}
+    declare -g INCLUDE_BUILD_HISTORY=${INCLUDE_BUILD_HISTORY:-"false"}
+
+    return 0
+}
+
+sanity_checks ()
+{
+    local bblcs="${CDR}/conf/bblayers.conf.sample"
+    local bspdir="${CWD}"
+    local bblayers
+    local bbprojects
+
+    if [[ "$(whoami)" = "root" ]]; then
+        echo "ERROR: Do not use the BSP as user 'root'."
+        echo "       Exiting..."
+        return 1
+    fi
+
+    eval $(grep -v '^#\|^$' "${bblcs}" | \
+           sed -e 's/\s//g' -e 's/\\$//g' -e 's/[:|?]=/=/g' \
+               -e 's/\(BSPDIR\)=.*$/\1=\"${bspdir}\"/g' \
+          )
+
+    for l in ${BBLAYERS}; do
+        if [[ "$(basename ${l})" != "meta"* ]]; then
+            echo "ERROR: Malformatted layer name found: '${l##${bspdir}/}'."
+            echo "       Exiting..."
+            return 1
+        fi
+
+        if [[ "$(dirname ${l})" == *"${MAGICSRC}" ]]; then
+            # single layer project
+            bbprojects="${bbprojects} ${l}"
+	else
+            # multi-layer project
+            bbprojects="${bbprojects} $(dirname ${l})"
+        fi
+
+        bblayers="${bblayers} ${l}"
+    done
+
+    for p in $(echo "${bbprojects}" | tr " " "\n" | sort -u); do
+        if [[ ! -d "${p}" ]]; then
+            echo "ERROR: BitBake project does not exist: '${p##${bspdir}/}'."
+            echo "       Exiting..."
+            return 1
+        fi
+    done
+
+    for l in $(echo "${bblayers}" | tr " " "\n" | sort -u); do
+        if [[ ! -r "${l}/conf/layer.conf" ]]; then
+            echo "ERROR: BitBake meta layer does not exist: '${l##${bspdir}/}'."
+            echo "       Exiting..."
+            return 1
+        fi
+    done
+
+    return 0
+}
+
+generated_config=
+write_local_conf_additions()
+{
+    # now we cd'ed into the ${BUILD_DIR}, operate relative
+    local cd="./conf"
+    local lcc="${cd}/local.conf"
+    local lcn="${cd}/local.conf.new"
+    local lca="${cd}/local.conf.append"
+    local lbm="# BEGIN ${MAGICKEY} Additions"
+    local lsm="# AdditionsSha1Sum:"
+    local lgm="# ${MAGICKEY} Additions generated $(LANG= date)"
+    local lem="# END ${MAGICKEY} Additions"
+
+    # This function turns environment variables into Yocto Variables.
+    # It does this by adding a section to 'local.conf'.
+    if [[ -d "${cd}" ]]; then
+
+        echo > "${lca}"
+        echo "${lbm}" >> "${lca}"
+
+        for var in ${PASSED_VARS}; do
+            varval="$(eval echo \$${var})"
+            if [[ -n "${varval}" ]]; then
+                echo "${var} = \"${varval}\"" >> "${lca}"
+            else
+                # persist the values in a new shell by reading them from the
+                # local.conf if they aren't in in the current environment
+                grep "^${var}\\s=" "${lcc}" >> "${lca}" || true
+            fi
+        done
+
+        if [[ -r "${lca}" ]]; then
+            lcaSha1sumAdditions=$(sha1sum "${lca}" | cut -d' ' -f1)
+            lccSha1sumAdditions=$(grep "^${lsm}.*\$" "${lcc}" | \
+                                  tail -1 | sed -e "s/${lsm} //") || true
+            if [[ "${lcaSha1sumAdditions}" != "$lccSha1sumAdditions" ]]; then
+                sed -e "/${lbm}/,/${lem}/d" "${lcc}" > "${lcn}"
+                sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' "${lcn}"
+                echo "${lsm} ${lcaSha1sumAdditions}">> "${lca}"
+                echo "${lgm}" >> "${lca}"
+                echo "${lem}" >> "${lca}"
+                echo >> "${lca}"
+                cat "${lcn}" "${lca}" > "${lcc}"
+                rm -f "${lcn}" "${lca}"
+            fi
+        fi
+
+    fi
+
+    generated_config="${lcc}"
+
+    return 0
+}
+
+have_siteconfig=
+link_site_conf ()
+{
+    # now we cd'ed into the ${BUILD_DIR}, operate relative
+    local cd="./conf"
+    local sc="${cd}/site.conf"
+
+    # link site.conf only if it does not exist
+    # i.e. never ever modify if it exists as file
+    if [[ -d "${cd}" ]] && [[ ! -f "${sc}" ]]; then
+        for sd in ${SITECONF_DIRS}; do
+            local sf="${sd}/site.conf"
+            if [[ -r "${sf}" ]]; then
+                echo "linking ${sf} to ${sc}"
+                ln -s "${sf}" "${sc}"
+                break
+            fi
+        done
+    fi
+
+    if [[ -r "${sc}" ]]; then
+        have_siteconfig="${sc}"
+    fi
+
+    return 0
+}
+
+have_bblayers=
+init_bitbake ()
+{
+    # init a fresh environment on demand
+    [[ "x${CLEAN_BUILD}" == 'xtrue' ]] && rm -rf "${BUILD_DIR}"
+    TEMPLATECONF="${CDR}/conf" source "${YPR}/oe-init-build-env" "${BUILD_DIR}"
+
+    # now we cd'ed into the ${BUILD_DIR}, operate relative
+    local cd="./conf"
+    local bblc="${cd}/bblayers.conf"
+
+    write_local_conf_additions
+    link_site_conf
+
+    if [[ -r "${bblc}" ]]; then
+        have_bblayers="${bblc}"
+    fi
+
+    return 0
+}
+
+main ()
+{
+    init_variables
+    sanity_checks && init_bitbake
+
+    if [[ -n "${generated_config}" ]]; then
+        echo "Your local configuration file at:"; echo
+        echo "    '$(realpath -s ${generated_config})'"; echo
+        echo "contains:"; echo
+        grep -v '^#\|^$' "${generated_config}" | sed -e 's/^/    /'; echo
+    fi
+
+    if [[ -n "${have_siteconfig}" ]]; then
+        echo "Your site configuration file at:"; echo
+        echo "    '$(realpath -s ${have_siteconfig})'";
+        echo "    -> '$(realpath -P ${have_siteconfig})'"; echo
+        echo "contains:"; echo
+        grep -v '^#\|^$' "${have_siteconfig}" | sed -e 's/^/    /'; echo
+    fi
+
+    if [[ -n "${have_bblayers}" ]]; then
+        echo "Your local bitbake layer configuration file at:"; echo
+        echo "    '$(realpath -s ${have_bblayers})'"; echo
+        echo "declares:"; echo
+	bitbake-layers show-layers
+    fi
+
+    clean_up
+
+    return 0
+}
+
+if [[ "x$(basename $0)" != "x${PROGNAME}" ]]; then
+    # sourcing => ok, execute main
+    main
+else
+    echo "ERROR: Do not execute the scipt, use 'source ${PROGNAME}'."
+    echo "       Exiting..."
+    usage
+    clean_up
+    exit 1
+fi
+
+return 0
