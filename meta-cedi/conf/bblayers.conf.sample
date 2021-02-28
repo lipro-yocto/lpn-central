@@ -12,5 +12,6 @@ BBLAYERS = " \
   ${BSPDIR}/sources/poky/meta-poky \
   ${BSPDIR}/sources/poky/meta-yocto-bsp \
   \
+  ${BSPDIR}/sources/central/meta \
   ${BSPDIR}/sources/central/meta-cedi \
 "
