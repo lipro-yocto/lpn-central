@@ -72,11 +72,11 @@ PASSED_VARS="                   \
     YOCTO_SSTATE_DIR            \
     PACKAGE_FEED_URIS           \
     PACKAGE_FEED_BASE_PATHS     \
-    INCLUDE_BUILD_HISTORY       \
     SDKMACHINE                  \
     DISTRO                      \
     MACHINE                     \
 "
+### NOT YET: INCLUDE_BUILD_HISTORY
 
 usage()
 {
@@ -96,7 +96,7 @@ BUILD_DIR
 CLEAN_BUILD
     Flag if true it removes the builddir before building.
     Default is false.
-INCLUDE_BUILD_HISTORY
+INCLUDE_BUILD_HISTORY (TODO: NOT YET)
     Record build changes via git build history.
     Default is false.
 
@@ -116,7 +116,8 @@ clean_up()
     unset MAGICKEY MAGICSRC CWD PROGNAME TEMPLATECONF
     unset SITECONF_DIRS PASSED_VARS
     unset BUILD_DIR CLEAN_BUILD
-    unset SDKMACHINE INCLUDE_BUILD_HISTORY
+    unset SDKMACHINE
+    ### NOT YET: unset INCLUDE_BUILD_HISTORY
     unset have_bblayers generated_config have_siteconfig
     unset write_local_conf_additions
     unset link_site_conf
@@ -140,7 +141,7 @@ init_variables ()
 
     # input flags - possibly injected
     declare -g CLEAN_BUILD=${CLEAN_BUILD:-"false"}
-    declare -g INCLUDE_BUILD_HISTORY=${INCLUDE_BUILD_HISTORY:-"false"}
+    ### NOT YET: declare -g INCLUDE_BUILD_HISTORY=${INCLUDE_BUILD_HISTORY:-"false"}
 
     return 0
 }
