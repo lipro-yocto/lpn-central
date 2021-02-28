@@ -145,6 +145,13 @@ BB_DISKMON_DIRS ??= "\
     ABORT,${SSTATE_DIR},100M,1K \
     ABORT,/tmp,10M,1K"
 
+BB_NUMBER_THREADS ?= "${@oe.utils.cpu_count()}"
+PARALLEL_MAKE ?= "-j ${@oe.utils.cpu_count()}"
+
+BB_GENERATE_MIRROR_TARBALLS = "0"
+INHERIT += "rm_work"
+RM_OLD_IMAGE = "1"
+
 #
 # Shared-state files from other locations
 #
