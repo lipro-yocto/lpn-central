@@ -194,6 +194,7 @@ RM_OLD_IMAGE = "1"
 # The default is a downloads directory under TOPDIR which is the build directory.
 #
 #DL_DIR ?= "${TOPDIR}/downloads"
+DL_DIR ?= "${@d.getVar('YOCTO_DOWNLOAD_DIR') if d.getVar('YOCTO_DOWNLOAD_DIR') else '${TOPDIR}/downloads' }"
 
 #
 # Where to place shared-state files
@@ -210,6 +211,7 @@ RM_OLD_IMAGE = "1"
 # The default is a sstate-cache directory under TOPDIR.
 #
 #SSTATE_DIR ?= "${TOPDIR}/sstate-cache"
+SSTATE_DIR ?= "${@d.getVar('YOCTO_SSTATE_DIR') if d.getVar('YOCTO_SSTATE_DIR') else '${TOPDIR}/sstate-cache' }"
 
 #
 # Where to place the build output
@@ -222,6 +224,7 @@ RM_OLD_IMAGE = "1"
 # The default is a tmp directory under TOPDIR.
 #
 #TMPDIR = "${TOPDIR}/tmp"
+TMPDIR = "${TOPDIR}/tmp-${DISTRO}"
 
 #
 # Qemu configuration
@@ -240,6 +243,15 @@ PACKAGECONFIG_append_pn-nativesdk-qemu = " sdl"
 #PACKAGECONFIG_append_pn-qemu-system-native = " gtk+"
 #PACKAGECONFIG_append_pn-qemu-native = " gtk+"
 #PACKAGECONFIG_append_pn-nativesdk-qemu = " gtk+"
+
+#
+# Build History
+#
+# Add build history if INCLUDE_BUILD_HISTORY envar is set either in site.conf or the
+# shell environment
+INHERIT += "${@'buildhistory' if d.getVar('INCLUDE_BUILD_HISTORY') == 'true' else ''}"
+BUILDHISTORY_COMMIT = "${@'1' if d.getVar('INCLUDE_BUILD_HISTORY') == 'true' else ''}"
+BUILDHISTORY_DIR = "${@'${TOPDIR}/buildhistory' if d.getVar('INCLUDE_BUILD_HISTORY') == 'true' else ''}"
 
 #
 # Hash Equivalence
