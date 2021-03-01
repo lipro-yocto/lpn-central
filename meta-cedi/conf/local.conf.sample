@@ -77,9 +77,12 @@ PACKAGE_FEED_BASE_PATHS ?= "ci release updates"
 # SDK target architecture
 #
 # This variable specifies the architecture to build SDK items for and means
-# you can build the SDK packages for architectures other than the machine you are
-# running the build on (i.e. building i686 packages on an x86_64 host).
-# Supported values are i686 and x86_64
+# you can build the SDK packages for architectures other than the machine you
+# are running the build on (i.e. building i686 packages on an x86_64 host).
+# Supported values are i686 and x86_64, together with the Layer for MinGW
+# based SDKs the additional values i686-mingw32 and x86_64-mingw32 are valid.
+#SDKMACHINE ?= "i686-mingw32"
+#SDKMACHINE ?= "x86_64-mingw32"
 #SDKMACHINE ?= "i686"
 SDKMACHINE ?= "x86_64"
 

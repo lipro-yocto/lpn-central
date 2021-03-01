@@ -12,6 +12,8 @@ BBLAYERS = " \
   ${BSPDIR}/sources/poky/meta-poky \
   ${BSPDIR}/sources/poky/meta-yocto-bsp \
   \
+  ${BSPDIR}/sources/yocto/meta-mingw \
+  \
   ${BSPDIR}/sources/openembedded/meta-oe \
   ${BSPDIR}/sources/openembedded/meta-python \
   ${BSPDIR}/sources/openembedded/meta-initramfs \
