@@ -252,9 +252,9 @@ PACKAGECONFIG_append_pn-nativesdk-qemu = " sdl"
 #
 # Add build history if INCLUDE_BUILD_HISTORY envar is set either in site.conf or the
 # shell environment
-### NOT YET: INHERIT += "${@'buildhistory' if d.getVar('INCLUDE_BUILD_HISTORY') == 'true' else ''}"
-### NOT YET: BUILDHISTORY_COMMIT = "${@'1' if d.getVar('INCLUDE_BUILD_HISTORY') == 'true' else ''}"
-### NOT YET: BUILDHISTORY_DIR = "${@'${TOPDIR}/buildhistory' if d.getVar('INCLUDE_BUILD_HISTORY') == 'true' else ''}"
+INHERIT += "${@'buildhistory' if d.getVar('INCLUDE_BUILD_HISTORY') == 'true' else ''}"
+BUILDHISTORY_COMMIT = "${@'1' if d.getVar('INCLUDE_BUILD_HISTORY') == 'true' else ''}"
+BUILDHISTORY_DIR ?= "${TOPDIR}/buildhistory"
 
 #
 # Hash Equivalence
