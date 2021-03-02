@@ -1,0 +1,499 @@
+= Li-Pro.Net Central embedded environment
+Stephan Linz <linz@li-pro.net>
+:revnumber: 0.1
+:revdate: 2021/03/02
+:revremark: The first incarnation of {doctitle}
+:version-label!:
+:sectnums:
+:toc:
+:toclevels: 4
+:toc-placement!:
+:yoctoadtman: http://www.yoctoproject.org/docs/current/adt-manual/adt-manual.html
+:yoctodevman: http://www.yoctoproject.org/docs/current/dev-manual/dev-manual.html
+:yoctoprofman: http://www.yoctoproject.org/docs/current/profile-manual/profile-manual.html
+:yoctorefman: http://www.yoctoproject.org/docs/current/ref-manual/ref-manual.html
+:yoctosdkman: https://www.yoctoproject.org/docs/current/sdk-manual/sdk-manual.html
+:imagesdir: contrib
+:central-image-minimal: central-image-minimal.svg
+:central-flavour-images: central-flavour-images.svg
+
+Central is an integration of various components to form a complete prepackaged
+build system and development environment derived from Poky. Central is another
+word for concentration, inner, or main. This points exactly to the goals here.
+
+toc::[]
+
+== Architecture
+
+Central defines two different working domains that are all common for a generic
+embedded device.
+
+[ditaa]
+----
+    +---------------------------+
+    |{s}     +---------------+  |
+    |        |{o}   +-----+  |  |
+    | CEDI   |      |{d}  |  |  |
+    |        | CORE | BSP |  |  |
+    |        |      |     |  |  |
+    |        |      +-----+  |  |
+    |        +---------------+  |
+    +---------------------------+
+----
+
+Central Distro (CEDI)::
+
+The Li-Pro.Net Central Distribution for demonstartion purposes.
+
+Core Components (CORE)::
+
+The CORE provides packages and features to extend the Yocto core functionality
+with the new Central distribution and more differentiated definitions for the
+image build process.
+
+BSP Components (BSP)::
+
+The BSP provides adaptions and corrections of given external Yocto BSP layer.
+
+== Yocto Integration
+
+The scope of the Yocto integration includes `meta-cedi` and `meta-lpn-bsp`
+of this multi layer project.
+
+=== Layers
+
+[ditaa]
+----
+-=------------------------------------------------------------------------------
+                                                            BitBake priority 7
+
+                                         /---------------\
+                                         |   meta-qt5    |
+                                         \-------+-------/
+                                                 |
+-=---------------------------------------------  | -=---------------------------
+                                                 |          BitBake priority 6
+                                                 V
+/----------------\   /---------------\   /---------------\   /---------------\
+|  meta-lpn-bsp  +-->|   meta-cedi   +-->: meta(central) :<--+    meta-oe    :
+\----------------/   \-------+-------/   \-------+-------/   \-------+-------/
+                             |                   :
+-=-------------------------  | -=--------------  | -=---------------------------
+                             |                   |          BitBake priority 5
+                             V                   |
+/----------------\   /---------------\           |
+| meta-yocto-bsp +-->|   meta-poky   |           |
+\----------------/   \-------+-------/           |
+                             |                   |
+                             V                   |
+                     /---------------\           |
+                     :  meta(yocto)  +<----------/
+                     \---------------/
+
+Legend
+
+/-\ A needs B /=\   /-\ C needs D /-\
+|A+---------->+B|   |C+<--------->+D|
+\-/           \-/   \-/ D needs C \-/
+
+A, C, and D are in scope, provided by this project.
+B is out of scope, provided by external project.
+----
+
+=== Features
+
+Concepts::
+
+Yocto maintains machines, distributions and images. A distribution is kind of
+superset of features that are deployable to various machines by one or
+multiple images. {yoctorefman}#ref-features[Features] can be used to describe
+an image, a machine or a distribution. They can grouped into
+`FEATURE_PACKAGES`, that are mapped to package groups. Package groups provide
+the container where packages fall in.
+
+==== Distribution Features
+
+The Central Project is using {yoctorefman}#ref-features-distro[distro features]
+as shipped with the Yocto Project metadata. There are some features that are
+part of all images if:
+
+* the machine supports that features
+* the feature is not explicitly excluded by the image definition
+
+Those features are declared in the Central distribution and are available via
+the package feed.
+
+.Features enabled by the Central distribution
+[cols="1s,4",frame="topbot",options="header"]
+|===
+|Feature             |Meaning
+|acl                 |Include ACL file attribute support.
+|alsa                |Include ALSA support (OSS compatibility kernel modules
+                      installed if available).
+|api-documentation   |Enables generation of API documentation during recipe
+                      builds. The resulting documentation is added to SDK
+                      tarballs when the `bitbake -c populate_sdk` command
+                      is used. See the
+                      {yoctosdkman}#adding-api-documentation-to-the-standard-sdk[
+                      "Adding API Documentation to the Standard SDK"] section
+                      in the Yocto Project Application Development and the
+                      Extensible Software Development Kit (eSDK) manual.
+|bluetooth           |Include bluetooth support (integrated BT only).
+|cramfs              |Include CramFS support.
+|directfb            |Include DirectFB support.
+|ext2                |Include tools for supporting for devices with internal
+                      HDD or Microdrive for storing files (instead of Flash
+                      only devices).
+|ipsec               |Include IPSec support.
+|ipv6                |Include IPv6 support.
+|keyboard            |Include keyboard support (e.g. keymaps will be loaded
+                      during boot).
+|largefile           |Include large file support (enabled per default).
+|ldconfig            |Include support for `ldconfig` and `ld.so.conf` on the
+                      target.
+|multiarch           |Include multiple architecture support (experimental).
+|nfs                 |Include NFS client support (for mounting NFS exports on
+                      device).
+|opengl              |Include the Open Graphics Library, which is a
+                      cross-language, multi-platform application programming
+                      interface used for rendering two and three-dimensional
+                      graphics.
+|pci                 |Include PCI bus support.
+|pcmcia              |Include PCMCIA/CompactFlash support.
+|ppp                 |Include PPP dialup support.
+|ptest               |Enables building the package tests where supported by
+                      individual recipes. For more information on package tests,
+                      see the {yoctodevman}#testing-packages-with-ptest["Testing
+                      Packages With ptest"] section in the Yocto Project
+                      Development Tasks Manual.
+|smbfs               |Include SMB networks client support (for mounting
+                      Samba/Microsoft Windows shares on device).
+|systemd             |Include support for this `init` manager, which is a full
+                      replacement of for `init` with parallel starting of
+                      services, reduced shell overhead, and other features.
+                      This `init` manager is used by many distributions.
+|usbgadget           |Include USB Gadget Device support (for USB networking,
+                      serial, storage).
+|usbhost             |Include USB Host support (allows to connect external
+                      keyboard, mouse, storage, network etc).
+|wayland             |Include the Wayland display server protocol and the
+                      library that supports it.
+|wifi                |Include WiFi support (integrated only).
+|xattr               |Include extended file attribute support.
+|x11                 |Include the X server and libraries.
+|===
+
+==== Image Features
+
+The Central Project is using {yoctorefman}#ref-features-image[image features]
+as shipped with the Yocto Project metadata and introduce new images features
+as shown below. The image features are relevant for production and development.
+
+.Features used by Central production images
+[cols="1s,4a",frame="topbot",options="header"]
+|===
+|Feature             |Meaning
+|_base-central_      |Installs packages that are prerequisite to all the other
+                      production features and is configured to every Central image
+                      intrinsically. *_base-central_* is not a real image feature
+                      and can not present explicitly in `IMAGE_FEATURES`. The
+                      related package groups will be enabled permanently by
+                      the Central image class `central-image.bbclass`.
+
+                      Install Central Package Groups::
+
+                      * *packagegroup-base-central*, replace
+                        *packagegroup-central-base*
+|package-management  |Installs package management tools and preserves the
+                      package manager database.
+|splash              |Enables showing a splash screen during boot. By default,
+                      this screen is provided by `psplash`, which does allow
+                      customization. If you prefer to use an alternative splash
+                      screen package, you can do so by setting the `SPLASH`
+                      variable to a different package name (or names) within
+                      the image recipe or at the distro configuration level.
+|x11-base            |Installs the X server with a minimal environment. It is
+                      depending directly on the *x11* feature that have to
+                      contain in `DISTRO_FEATURES`.
+|===
+
+.Features used by Central development images
+[cols="1s,4a",frame="topbot",options="header"]
+|===
+|Feature             |Meaning
+|allow-empty-password|Allows Dropbear and OpenSSH to accept root logins and
+                      logins from accounts having an empty password string.
+|debug-tweaks        |Makes an image suitable for development (e.g. allows root
+                      logins without passwords and enables post-installation
+                      logging). See the features
+                      {yoctorefman}#ref-features-image[*allow-empty-password*],
+                      {yoctorefman}#ref-features-image[*empty-root-password*],
+                      {yoctorefman}#ref-features-image[*post-install-logging*]
+                      in the Yocto Project Reference Manual for additional
+                      information.
+|dev-pkgs            |Installs development packages (headers and extra library
+                      links) for all packages installed in a given image.
+|empty-root-password |Sets the root password to an empty string, which allows
+                      logins with a blank password.
+|post-install-logging|Enables logging postinstall script runs to the
+                      `/var/log/postinstall.log` file on first boot of the image
+                      on the target system.
+|eclipse-debug       |Provides Eclipse remote debugging support.
+|qt5-sdk             |*Introduced and only usable by Central:*
+                      Installs a full Qt5 SDK and demo application that runs on
+                      the device. The behavior is similar to the class
+                      `populate_sdk_qt5` or image `meta-toolchain-qt5` with
+                      activated feature `qtcreator-debug`.
+
+                      Install Qt5 Package Groups::
+
+                      * *packagegroup-qt5-toolchain-target*
+                      * *packagegroup-qt5-qtcreator-debug*
+|ssh-server-openssh  |Installs the OpenSSH SSH server, which is more
+                      full-featured than Dropbear. Note that if both the
+                      OpenSSH SSH server and the Dropbear minimal SSH server
+                      are present in `IMAGE_FEATURES`, then OpenSSH will take
+                      precedence and Dropbear will not be installed. See the
+                      {yoctorefman}#ref-features-image[*ssh-server-dropbear*]
+                      features in the Yocto Project Reference Manual too.
+|tools-cross         |*Introduced and only usable by Central:*
+                      Installs basic cross development tools.
+
+                      Install Central Package Groups <- dependent image feature::
+
+                      * *packagegroup-central-tools-cross*
+|tools-debug         |Installs debugging tools such as `strace` and `gdb`. For
+                      information on GDB, see the
+                      {yoctodevman}#platdev-gdb-remotedebug["Debugging With the
+                      GNU Project Debugger (GDB) Remotely"] section in the Yocto
+                      Project Development Manual. For information on tracing and
+                      profiling, see the {yoctoprofman}[Yocto Project Profiling
+                      and Tracing Manual].
+
+                      Install Central Package Groups <- dependent image feature::
+
+                      * *packagegroup-central-tools-debug*
+|tools-profile       |Installs profiling tools such as `oprofile`, `exmap`, and
+                      `LTTng`. For general information on user-space tools, see
+                      the {yoctoadtman}#user-space-tools["User-Space Tools"]
+                      section in the Yocto Project Application Developer's Guide.
+
+                      Install Central Package Groups <- dependent image feature::
+
+                      * *packagegroup-central-tools-profile*
+|tools-sdk           |Installs a full SDK that runs on the device.
+
+                      Install Central Package Groups <- dependent image feature::
+
+                      * *packagegroup-central-sdk*, replace
+                        *packagegroup-central-dev*
+|tools-testapps      |Installs device testing tools (e.g. touchscreen debugging).
+
+                      Install Central Package Groups <- dependent image feature::
+
+                      * *packagegroup-central-tools-testapps*
+|===
+
+=== Images
+
+==== Central Minimal Images
+
+[#img-central-minimal-images-overview]
+.Central Minimal Images Relationships
+[link={imagesdir}/{central-image-minimal},window=_blank]
+image::{central-image-minimal}[Central Minimal Images,role="related thumb right"]
+
+.Central Minimal Images
+[cols="6h,8a,8a",frame="topbot",options="header"]
+|===
+    |Image Name 2+|Formal Description
+    |central-image-minimal
+2.1+|A small image just capable of allowing an Central device to boot.
+     It is a direct derivation of the Yocto core image with Central specific
+     enhancements to enable booting.
+[source,bitbake]
+require ${COREBASE}/meta/recipes-core/images/core-image-minimal.bb
+IMAGE_INSTALL += "packagegroup-central-boot ${CENTRAL_IMAGE_EXTRA_INSTALL}"
+
+<<<
+1.3+|central-image-minimal-dev
+2.1+|A small image just capable of allowing an Central device to boot and is
+     suitable for development work.
+[source,bitbake]
+require central-image-minimal.bb
+
+<<<
+   h|Yocto image features h|Central image features
+   a|* dev-pkgs
+   a|
+1.3+|central-image-minimal-mtdutils
+2.1+|A small image capable of booting a Central device with support for the
+     Minimal Memory Technology Devices (MTD) Utilities, which let the user
+     interact with the MTD subsystem in the kernel to perform operations
+     on flash devices.
+[source,bitbake]
+require central-image-minimal.bb
+
+<<<
+   h|Yocto image features h|Central image features
+   a|* mtd-utils
+   a|
+    |central-image-minimal-initramfs
+2.1+|A small image capable of booting a Central device. The kernel includes the
+     Minimal RAM-based Initial Root Filesystem (initramfs), which finds the
+     first 'init' program more efficiently. It is a direct derivation of the
+     Yocto core initramfs image.
+[source,bitbake]
+require ${COREBASE}/meta/recipes-core/images/core-image-minimal-initramfs.bb
+
+<<<
+|===
+
+==== Central Product, Debug and Development Images
+
+[#img-central-minimal-images-overview]
+.Central Flavour Images Relationships
+[link={imagesdir}/{central-flavour-images},window=_blank]
+image::{central-flavour-images}[Central Flavour Images,role="related thumb right"]
+
+.Central Product Images
+[cols="6h,8a,8a",frame="topbot",options="header"]
+|===
+    |Image Name 2+|Formal Description
+1.3+|central-image-base
+2.1+|A console-only image that fully supports the target device hardware
+     provided by Central.
+   h|Yocto image features h|Central image features
+   a|* package-management
+     * splash
+   a|
+1.3+|central-image
+2.1+|A product image capable of allowing an Central device to boot in graphical
+     mode and provides full feature support.
+[source,bitbake]
+require central-image-base.bb
+
+<<<
+   h|Yocto image <- distro features h|Central image features
+   a|* x11-base <- x11
+   a|
+|===
+
+.Central Development Images
+[cols="6h,8a,8a",frame="topbot",options="header"]
+|===
+    |Image Name 2+|Formal Description
+1.3+|central-image-dev
+2.1+|A console-only image that fully supports the target device hardware for
+     development provided by Central.
+   h|Yocto image features h|Central image features
+   a|* debug-tweaks
+     * ssh-server-openssh
+     * tools-sdk
+     * tools-testapps
+     * ptest-pkgs
+   a|* tools-cross
+1.3+|central-dev-image
+2.1+|A developer image just capable of allowing an Central device to boot in
+     graphical mode and is suitable for full featured development work.
+[source,bitbake]
+require central-image-dev.bb
+require central-image.bb
+
+<<<
+   h|Yocto image features h|Central image features
+   a|
+   a|* qt5-sdk
+|===
+
+.Central Debug and Development Images
+[cols="6h,8a,8a",frame="topbot",options="header"]
+|===
+    |Image Name 2+|Formal Description
+1.3+|central-image-debug
+2.1+|A console-only image that fully supports the target device hardware for
+     debugging development provided by Central.
+   h|Yocto image features h|Central image features
+   a|* debug-tweaks
+     * ssh-server-openssh
+     * eclipse-debug
+     * tools-debug
+     * tools-profile
+     * tools-sdk
+     * dev-pkgs
+     * dbg-pkgs
+     * src-pkgs
+   a|* tools-cross
+1.3+|central-debug-image
+2.1+|A developer image just capable of allowing an Central device to boot in
+     graphical mode and is suitable for full featured debugging and
+     development work.
+[source,bitbake]
+require central-image-debug.bb
+require central-image.bb
+
+<<<
+   h|Yocto image features h|Central image features
+   a|
+   a|* qt5-sdk
+|===
+
+== Contributing
+
+To contribute to the setup you should send a pull request to this GitHub
+project or send the patches for review to the authors mailing address.
+
+Issue tracker::
+    https://github.com/lipro-yocto/lpn-central/issues
+
+Pull requests::
+    https://github.com/lipro-yocto/lpn-central/pulls
+
+Source code::
+    https://github.com/lipro-yocto/lpn-central
+
+When creating patches, please use something like:
+
+[source,console]
+$: git format-patch -s --subject-prefix='lpn-central][PATCH' origin
+
+When sending patches, please use something like:
+
+[source,console]
+$: git send-email --to rexut@users.noreply.github.com <generated patch>
+
+To contribute to the development of this BSP and/or submit patches for
+new boards please send the patches against the respective project as
+informated bellow:
+
+The following layers are included on this release:
+
+.Included Layers
+[cols=">1s,1,3"]
+|===
+1.5+^.^|poky 2+|base build system and metadata
+       |Path        |`sources/poky`
+       |GIT         |git://git.yoctoproject.org/poky
+       |Project     |https://www.yoctoproject.org/tools-resources/projects/poky
+       |Mailing list|https://lists.yoctoproject.org/listinfo/yocto
+1.5+^.^|meta-mingw 2+|collection of extra packages and features for MinGW based SDKs
+       |Path        |`sources/meta-mingw`
+       |GIT         |git://git.yoctoproject.org/meta-mingw
+       |Project     |https://git.yoctoproject.org/cgit/cgit.cgi/meta-mingw
+       |Mailing list|https://lists.yoctoproject.org/listinfo/yocto +
+                     NOTE: Use [meta-mingw] in subject to easy the processing
+1.5+^.^|meta-openembedded 2+|collection of OpenEmbedded extra packages and features
+       |Path        |`sources/meta-openembedded`
+       |GIT         |git://github.com/openembedded/meta-openembedded.git +
+                     git://git.openembedded.org/meta-openembedded
+       |Project     |https://github.com/openembedded/meta-openembedded +
+                     http://git.openembedded.org/meta-openembedded
+       |Mailing list|http://lists.openembedded.org/mailman/listinfo/openembedded-devel +
+                     NOTE: Use [meta-oe] in subject to easy the processing
+1.5+^.^|meta-qt5 2+|support for Qt5 extra packages and features
+       |Path        |`sources/meta-qt5`
+       |GIT         |git://github.com/meta-qt5/meta-qt5.git
+       |Project     |https://github.com/meta-qt5/meta-qt5
+       |Mailing list|http://lists.openembedded.org/mailman/listinfo/openembedded-devel +
+                     NOTE: Use [meta-qt5] in subject to easy the processing
+|===
