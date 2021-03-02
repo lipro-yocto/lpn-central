@@ -25,4 +25,5 @@ BBLAYERS = " \
   \
   ${BSPDIR}/sources/central/meta \
   ${BSPDIR}/sources/central/meta-cedi \
+  ${BSPDIR}/sources/central/meta-lpn-bsp \
 "
